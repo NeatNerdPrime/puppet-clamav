@@ -75,6 +75,27 @@ describe 'clamav', type: :class do
           it { is_expected.to contain_package('clamd') }
           it { is_expected.to contain_file('clamd.conf') }
           it { is_expected.to contain_service('clamd') }
+
+          # RedHat-family supported releases (7/8) resolve clamd_service to
+          # 'clamd@scan' (params.pp's major >= 7 branch); Debian/Ubuntu
+          # resolve to 'clamav-daemon'.
+          expected_unit = (facts[:osfamily] == 'Debian') ? 'clamav-daemon' : 'clamd@scan'
+          expected_dropin_dir = "/etc/systemd/system/#{expected_unit}.service.d"
+
+          it {
+            is_expected.to contain_file('clamd_dropin_dir').with(
+              'ensure' => 'directory',
+              'path'   => expected_dropin_dir,
+            )
+          }
+
+          it {
+            is_expected.to contain_file('clamd_runtimedirectory_override').with(
+              'ensure'  => 'file',
+              'path'    => "#{expected_dropin_dir}/runtimedirectory.conf",
+              'content' => "[Service]\nRuntimeDirectory=clamav\n",
+            )
+          }
         end
       end
 

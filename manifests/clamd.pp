@@ -32,4 +32,30 @@ class clamav::clamd(
     hasstatus  => true,
     subscribe  => [Package['clamd'], File['clamd.conf']],
   }
+
+  # /run/clamav (clamd's LocalSocket directory) is not guaranteed to exist
+  # on boot: /run is tmpfs, and the packaged clamd/clamav-daemon service
+  # unit ships no RuntimeDirectory= directive. systemd auto-creates
+  # $path/clamav owned by the service's User=/Group= before ExecStart and
+  # removes it after stop, replacing a hand-rolled ExecStartPre=mkdir/chown.
+  $clamd_dropin_dir = "/etc/systemd/system/${clamav::clamd_service}.service.d"
+
+  file { 'clamd_dropin_dir':
+    ensure => directory,
+    path   => $clamd_dropin_dir,
+    mode   => '0755',
+    owner  => 'root',
+    group  => 'root',
+  }
+
+  file { 'clamd_runtimedirectory_override':
+    ensure  => file,
+    path    => "${clamd_dropin_dir}/runtimedirectory.conf",
+    mode    => '0644',
+    owner   => 'root',
+    group   => 'root',
+    content => "[Service]\nRuntimeDirectory=clamav\n",
+    require => File['clamd_dropin_dir'],
+    notify  => Service['clamd'],
+  }
 }
